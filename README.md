@@ -1,6 +1,6 @@
 # SnackTrack
 
-#### (Or a slightly schizo way of figuring if there's a midnight scnacker at the office)
+#### (Or a slightly schizo way of figuring if there's a midnight snacker at the office)
 
 ## What's this
 
