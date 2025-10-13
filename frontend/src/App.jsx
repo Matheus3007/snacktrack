@@ -15,7 +15,7 @@ function App() {
 
   const isAfterHours = (date) => {
     const hour = date.getHours();
-    return hour >= 19 || hour < 7;
+    return hour >= 20 || hour < 7;
   };
 
   const fetchEvents = async () => {
@@ -99,7 +99,7 @@ function App() {
           backgroundColor: 'rgba(54, 162, 235, 0.6)',
         },
         {
-          label: 'After Hours (SUSPICIOUS)',
+          label: 'After Hours',
           data: afterHourCounts,
           backgroundColor: 'rgba(255, 99, 132, 0.6)',
         }
