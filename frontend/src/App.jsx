@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
+import annotationPlugin from 'chartjs-plugin-annotation';
 import './App.css';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, annotationPlugin);
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -12,6 +13,7 @@ function App() {
   const [stats, setStats] = useState({ totalToday: 0, afterHours: 0, total: 0 });
   const [doorStatus, setDoorStatus] = useState({ isOpen: false, time: '', timeAgo: '' });
   const [lastUpdate, setLastUpdate] = useState('');
+  const [granularity, setGranularity] = useState(60);
 
   const isAfterHours = (date) => {
     const hour = date.getHours();
@@ -76,32 +78,47 @@ function App() {
   };
 
   const getChartData = () => {
-    const hourCounts = new Array(24).fill(0);
-    const afterHourCounts = new Array(24).fill(0);
+    const intervals = granularity === 60 ? 24 : granularity === 30 ? 48 : 96;
+    const counts = new Array(intervals).fill(0);
     
     events.forEach(event => {
-      const date = new Date(event.created_at);
-      const hour = date.getHours();
-      hourCounts[hour]++;
-      if (isAfterHours(date)) {
-        afterHourCounts[hour]++;
+      if (event.event_type.toLowerCase().includes('open') && !event.event_type.toLowerCase().includes('close')) {
+        const date = new Date(event.created_at);
+        const totalMinutes = date.getHours() * 60 + date.getMinutes();
+        const index = Math.floor(totalMinutes / granularity);
+        counts[index]++;
       }
     });
 
     return {
-      labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+      labels: Array.from({length: intervals}, (_, i) => {
+        const totalMinutes = i * granularity;
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return `${h}:${m.toString().padStart(2, '0')}`;
+      }),
       datasets: [
         {
-          label: 'Work Hours',
-          data: hourCounts.map((count, hour) => 
-            isAfterHours(new Date(0, 0, 0, hour)) ? 0 : count
-          ),
-          backgroundColor: 'rgba(54, 162, 235, 0.6)',
-        },
-        {
-          label: 'After Hours',
-          data: afterHourCounts,
-          backgroundColor: 'rgba(255, 99, 132, 0.6)',
+          label: '',
+          data: counts,
+          backgroundColor: counts.map((_, i) => {
+            const totalMinutes = i * granularity;
+            const hour = Math.floor(totalMinutes / 60);
+            return isAfterHours(new Date(0, 0, 0, hour)) 
+              ? 'rgba(255, 99, 132, 0.6)' 
+              : 'rgba(54, 162, 235, 0.6)';
+          }),
+          borderColor: counts.map((_, i) => {
+            const totalMinutes = i * granularity;
+            const hour = Math.floor(totalMinutes / 60);
+            return isAfterHours(new Date(0, 0, 0, hour)) 
+              ? 'rgba(255, 99, 132, 0.9)' 
+              : 'rgba(54, 162, 235, 0.9)';
+          }),
+          borderWidth: 1,
+          barThickness: 'flex',
+          categoryPercentage: 1.0,
+          barPercentage: 1.0,
         }
       ]
     };
@@ -116,17 +133,59 @@ function App() {
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: {
+      padding: 0
+    },
     scales: {
       y: {
         beginAtZero: true,
         ticks: { stepSize: 1 }
+      },
+      x: {
+        offset: false,
+        grid: {
+          offset: false
+        }
+      }
+    },
+    elements: {
+      bar: {
+        borderWidth: 1
       }
     },
     plugins: {
       title: {
-        display: true,
-        text: 'Door Opens by Hour of Day (All Time)',
-        font: { size: 16 }
+        display: false
+      },
+      legend: {
+        display: false
+      },
+      annotation: {
+        annotations: {
+          currentTime: {
+            type: 'line',
+            xMin: (new Date().getHours() * 60 + new Date().getMinutes()) / granularity - 0.5,
+            xMax: (new Date().getHours() * 60 + new Date().getMinutes()) / granularity - 0.5,
+            borderColor: 'rgba(255, 165, 0, 0.8)',
+            borderWidth: 2,
+            label: {
+              display: true,
+              content: 'Now',
+              position: 'start',
+              rotation: 270,
+              color: '#000',
+              backgroundColor: 'rgba(255, 255, 255, 0)',
+              borderColor: 'rgba(0, 0, 0, 0)',
+              padding: 0,
+              font: {
+                size: 16,
+                weight: 'bold'
+              },
+              xAdjust: -8,
+              yAdjust: -10
+            }
+          }
+        }
       }
     }
   };
@@ -163,7 +222,23 @@ function App() {
       </div>
 
       <div className="chart-container">
-        <Bar data={getChartData()} options={chartOptions} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold' }}>Door Opens by Time of Day (All Time)</div>
+            <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+              <span style={{ color: 'rgba(54, 162, 235, 1)' }}>■</span> Work Hours (7AM-8PM) 
+              <span style={{ marginLeft: '12px', color: 'rgba(255, 99, 132, 1)' }}>■</span> After Hours (8PM-7AM)
+            </div>
+          </div>
+          <select value={granularity} onChange={(e) => setGranularity(Number(e.target.value))} style={{ padding: '4px 8px', fontSize: '12px', border: '1px solid #ddd', borderRadius: '4px', background: 'white' }}>
+            <option value={60}>1 hour</option>
+            <option value={30}>30 min</option>
+            <option value={15}>15 min</option>
+          </select>
+        </div>
+        <div style={{ height: '400px' }}>
+          <Bar data={getChartData()} options={chartOptions} />
+        </div>
       </div>
 
       <div className="last-update">
