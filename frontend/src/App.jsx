@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import annotationPlugin from 'chartjs-plugin-annotation';
@@ -192,7 +193,10 @@ function App() {
 
   return (
     <div className="container">
-      <h1>🍿 Snack Locker Monitor</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1>🍿 Snack Locker Monitor</h1>
+        <Link to="/data" style={{ padding: '8px 16px', background: '#007bff', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '14px' }}>View Data</Link>
+      </div>
       <div className="subtitle">Real-time door activity tracking</div>
       
       <div className={`door-status ${doorStatus.isOpen ? 'open' : 'closed'}`}>
