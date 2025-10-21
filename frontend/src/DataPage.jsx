@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
+import { Bar, Line } from 'react-chartjs-2';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import './App.css';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, annotationPlugin);
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, annotationPlugin);
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 function DataPage() {
   const [events, setEvents] = useState([]);
   const [granularity, setGranularity] = useState(60);
+  const [timeseriesWindow, setTimeseriesWindow] = useState(24);
+  const [timeseriesInterval, setTimeseriesInterval] = useState(60);
+  const [timeseriesScroll, setTimeseriesScroll] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   const isAfterHours = (date) => {
     const hour = date.getHours();
@@ -107,18 +111,91 @@ function DataPage() {
     return { days, heatmap, maxCount };
   };
 
+  const getTimeseriesData = () => {
+    const safeWindow = Math.max(5, Math.min(100, timeseriesWindow || 24));
+    const safeInterval = Math.max(10, Math.min(1440, timeseriesInterval || 60));
+    const safeScroll = Math.max(0, timeseriesScroll || 0);
+    
+    const now = Date.now();
+    const intervalMs = safeInterval * 60 * 1000;
+    const totalBars = 200;
+    const allData = new Array(totalBars).fill(0);
+    const allLabels = [];
+
+    try {
+      for (let i = totalBars - 1; i >= 0; i--) {
+        const endTime = now - (i * intervalMs);
+        const startTime = endTime - intervalMs;
+        
+        const count = events.filter(e => {
+          if (!e.event_type.toLowerCase().includes('open') || e.event_type.toLowerCase().includes('close')) return false;
+          const eventTime = new Date(e.created_at).getTime();
+          return eventTime >= startTime && eventTime < endTime;
+        }).length;
+
+        allData[totalBars - 1 - i] = count;
+        
+        const date = new Date(endTime);
+        if (safeInterval >= 1440) {
+          allLabels.push(date.toLocaleDateString());
+        } else {
+          const hours = date.getHours().toString().padStart(2, '0');
+          const minutes = date.getMinutes().toString().padStart(2, '0');
+          allLabels.push(`${hours}:${minutes}`);
+        }
+      }
+    } catch (e) {
+      console.error('Timeseries calculation error:', e);
+    }
+
+    const maxScroll = Math.max(0, totalBars - safeWindow);
+    const clampedScroll = Math.min(safeScroll, maxScroll);
+    const start = Math.max(0, totalBars - safeWindow - clampedScroll);
+    const end = totalBars - clampedScroll;
+
+    return {
+      labels: allLabels.slice(start, end),
+      datasets: [{
+        label: 'Door Opens',
+        data: allData.slice(start, end),
+        borderColor: 'rgba(75, 192, 192, 1)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        tension: 0.4,
+        fill: true,
+      }],
+      maxScroll,
+      safeWindow
+    };
+  };
+
   const chartOptions = (todayOnly = false, maxY) => ({
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
     layout: { padding: 0 },
     scales: {
-      y: { beginAtZero: true, max: maxY, ticks: { stepSize: 1 } },
+      y: { beginAtZero: true, max: Math.ceil(maxY * 1.2), ticks: { stepSize: 1 } },
       x: { offset: false, grid: { offset: false } }
     },
     elements: { bar: { borderWidth: 1 } },
     plugins: {
       title: { display: false },
       legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (context) => {
+            const index = context[0].dataIndex;
+            const safeInterval = Math.max(10, Math.min(1440, timeseriesInterval || 60));
+            const safeScroll = Math.max(0, timeseriesScroll || 0);
+            const totalBars = 200;
+            const safeWindow = Math.max(5, Math.min(100, timeseriesWindow || 24));
+            const start = Math.max(0, totalBars - safeWindow - safeScroll);
+            const actualIndex = start + index;
+            const endTime = Date.now() - ((totalBars - 1 - actualIndex) * safeInterval * 60 * 1000);
+            return new Date(endTime).toLocaleString();
+          }
+        }
+      },
       annotation: todayOnly ? {
         annotations: {
           currentTime: {
@@ -149,6 +226,7 @@ function DataPage() {
   const { days, heatmap, maxCount } = getHeatmapData();
   const allTimeData = getChartData(false);
   const todayData = getChartData(true);
+  const timeseriesData = getTimeseriesData();
   const maxY = Math.max(allTimeData.maxValue, todayData.maxValue);
 
   return (
@@ -191,6 +269,83 @@ function DataPage() {
         </div>
         <div style={{ height: '300px' }}>
           <Bar data={todayData} options={chartOptions(true, maxY)} />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '40px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>Rolling Window Timeseries</div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <div>
+              <label style={{ fontSize: '12px', marginRight: '4px' }}>Bars:</label>
+              <input type="number" min="5" max="100" value={timeseriesWindow} onChange={(e) => { const v = Number(e.target.value); if (v >= 5 && v <= 100) setTimeseriesWindow(v); }} style={{ width: '60px', padding: '4px', fontSize: '12px', border: '1px solid #ddd', borderRadius: '4px' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', marginRight: '4px' }}>Interval:</label>
+              <select value={timeseriesInterval} onChange={(e) => setTimeseriesInterval(Number(e.target.value))} style={{ padding: '4px 8px', fontSize: '12px', border: '1px solid #ddd', borderRadius: '4px', background: 'white' }}>
+                <option value={10}>10 min</option>
+                <option value={15}>15 min</option>
+                <option value={30}>30 min</option>
+                <option value={60}>1 hour</option>
+                <option value={120}>2 hours</option>
+                <option value={240}>4 hours</option>
+                <option value={480}>8 hours</option>
+                <option value={720}>12 hours</option>
+                <option value={1440}>24 hours</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div style={{ height: '300px' }}>
+          <Line data={timeseriesData} options={chartOptions(false, Math.max(1, ...timeseriesData.datasets[0].data))} />
+        </div>
+        <div style={{ marginTop: '10px' }}>
+          <div style={{ position: 'relative', height: '40px', background: '#f0f0f0', borderRadius: '4px', cursor: 'grab' }}
+               onMouseDown={(e) => {
+                 setIsDragging(true);
+                 const rect = e.currentTarget.getBoundingClientRect();
+                 const startX = e.clientX;
+                 const startScroll = timeseriesScroll;
+                 
+                 const handleMove = (e) => {
+                   const deltaX = startX - e.clientX;
+                   const totalWidth = rect.width;
+                   const scrollDelta = (deltaX / totalWidth) * 200;
+                   setTimeseriesScroll(Math.max(0, Math.min(timeseriesData.maxScroll, startScroll + scrollDelta)));
+                 };
+                 
+                 const handleUp = () => {
+                   setIsDragging(false);
+                   document.removeEventListener('mousemove', handleMove);
+                   document.removeEventListener('mouseup', handleUp);
+                 };
+                 
+                 document.addEventListener('mousemove', handleMove);
+                 document.addEventListener('mouseup', handleUp);
+               }}>
+            <div style={{
+              position: 'absolute',
+              right: `${(timeseriesScroll / 200) * 100}%`,
+              width: `${(timeseriesData.safeWindow / 200) * 100}%`,
+              height: '100%',
+              background: 'rgba(75, 192, 192, 0.5)',
+              border: '2px solid rgba(75, 192, 192, 1)',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              color: '#333',
+              pointerEvents: 'none'
+            }}>
+              Viewing Window
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: '#666' }}>
+            <span>{new Date(Date.now() - 200 * timeseriesInterval * 60 * 1000).toLocaleDateString()}</span>
+            <span>{new Date().toLocaleDateString()}</span>
+          </div>
         </div>
       </div>
 
