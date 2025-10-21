@@ -121,6 +121,7 @@ function DataPage() {
     const totalBars = 200;
     const allData = new Array(totalBars).fill(0);
     const allLabels = [];
+    const allTimes = [];
 
     try {
       for (let i = totalBars - 1; i >= 0; i--) {
@@ -136,6 +137,7 @@ function DataPage() {
         allData[totalBars - 1 - i] = count;
         
         const date = new Date(endTime);
+        allTimes.push(date);
         if (safeInterval >= 1440) {
           allLabels.push(date.toLocaleDateString());
         } else {
@@ -153,12 +155,27 @@ function DataPage() {
     const start = Math.max(0, totalBars - safeWindow - clampedScroll);
     const end = totalBars - clampedScroll;
 
+    const slicedTimes = allTimes.slice(start, end);
+    const pointColors = slicedTimes.map(date => {
+      const hour = date.getHours();
+      return (hour >= 22 || hour < 7) ? 'rgba(255, 99, 132, 1)' : 'rgba(54, 162, 235, 1)';
+    });
+
     return {
       labels: allLabels.slice(start, end),
       datasets: [{
         label: 'Door Opens',
         data: allData.slice(start, end),
-        borderColor: 'rgba(75, 192, 192, 1)',
+        segment: {
+          borderColor: (ctx) => {
+            const idx = ctx.p0DataIndex;
+            const date = slicedTimes[idx];
+            const hour = date.getHours();
+            return (hour >= 22 || hour < 7) ? 'rgba(255, 99, 132, 1)' : 'rgba(54, 162, 235, 1)';
+          }
+        },
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
         backgroundColor: 'rgba(75, 192, 192, 0.2)',
         tension: 0.4,
         fill: true,
