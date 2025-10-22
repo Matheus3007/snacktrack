@@ -38,6 +38,65 @@ app.get('/api/events', async (req, res) => {
   }
 });
 
+// Get after-hours statistics
+app.get('/api/after-hours-stats', async (req, res) => {
+  try {
+    const days = req.query.days || 7;
+    const [afterHours, businessHours] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/rpc/get_after_hours_stats`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ days_back: parseInt(days) })
+      }).then(r => r.json()),
+      fetch(`${SUPABASE_URL}/rest/v1/rpc/get_business_hours_avg`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ days_back: parseInt(days) })
+      }).then(r => r.json())
+    ]);
+    
+    const stats = afterHours[0] || {};
+    const businessAvg = businessHours[0]?.avg_duration_seconds || 13.7;
+    
+    res.json([{ ...stats, business_hours_avg: businessAvg }]);
+  } catch (error) {
+    console.error('Error fetching after-hours stats:', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// Get after-hours events with durations
+app.get('/api/after-hours-events', async (req, res) => {
+  try {
+    const days = req.query.days || 30;
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/rpc/get_after_hours_events`,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ days_back: parseInt(days) })
+      }
+    );
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching after-hours events:', error);
+    res.status(500).json({ error: 'Failed to fetch events' });
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

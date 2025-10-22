@@ -195,7 +195,10 @@ function App() {
     <div className="container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1>🍿 Snack Locker Monitor</h1>
-        <Link to="/data" style={{ padding: '8px 16px', background: '#007bff', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '14px' }}>View Data</Link>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <Link to="/after-hours" style={{ padding: '8px 16px', background: '#dc3545', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '14px' }}>After-Hours</Link>
+          <Link to="/data" style={{ padding: '8px 16px', background: '#007bff', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '14px' }}>View Data</Link>
+        </div>
       </div>
       <div className="subtitle">Real-time door activity tracking</div>
       

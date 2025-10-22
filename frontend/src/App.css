@@ -131,3 +131,66 @@ h1 {
   font-size: 12px;
   margin-top: 20px;
 }
+.stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+.stat-card h3 {
+  margin: 0;
+  font-size: 2.5em;
+  color: #333;
+}
+
+.stat-card p {
+  margin: 10px 0 0 0;
+  color: #666;
+  font-size: 0.9em;
+}
+
+.stat-card.suspicious {
+  background: #fff5f5;
+  border: 2px solid #ff6384;
+}
+
+.stat-card.suspicious h3 {
+  color: #ff6384;
+}
+
+.back-link {
+  padding: 8px 16px;
+  background: #6c757d;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.back-link:hover {
+  background: #5a6268;
+}
+
+table {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+table th {
+  background: #f8f9fa;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid #dee2e6;
+}
+
+table td {
+  padding: 12px;
+}
+
+table tr:hover {
+  background: #f8f9fa;
+}
